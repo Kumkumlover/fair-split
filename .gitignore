@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Vercel
+.vercel
+
+# Planning / session files (internal only)
+task_plan.md
+findings.md
+progress.md
+
+# OS
+.DS_Store
+Thumbs.db

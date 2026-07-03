@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fair Split — AI Receipt Splitter</title>
+    <meta name="description" content="Upload a receipt and describe who had what. Fair Split uses AI to calculate everyone's exact share — down to the last rupee.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #0d0f14;
+            --surface: #161a24;
+            --surface2: #1e2333;
+            --border: rgba(255,255,255,0.07);
+            --accent: #6c63ff;
+            --accent2: #a78bfa;
+            --green: #34d399;
+            --red: #f87171;
+            --yellow: #fbbf24;
+            --text: #e8eaf0;
+            --muted: #8b91a7;
+            --radius: 16px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 24px 16px 64px;
+        }
+
+        /* HEADER */
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .logo-icon {
+            width: 44px; height: 44px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px;
+        }
+        h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+        .tagline { color: var(--muted); font-size: 14px; margin-top: 6px; }
+
+        /* CARD */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            max-width: 780px;
+            margin: 0 auto 20px;
+        }
+        .card-title {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--muted);
+            margin-bottom: 16px;
+        }
+
+        /* UPLOAD ZONE */
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 32px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--accent);
+            background: rgba(108, 99, 255, 0.05);
+        }
+        .upload-zone input[type="file"] {
+            position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+        }
+        .upload-icon { font-size: 36px; margin-bottom: 10px; }
+        .upload-label { font-size: 15px; font-weight: 500; }
+        .upload-hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+        .upload-preview {
+            display: none;
+            align-items: center;
+            gap: 14px;
+            background: var(--surface2);
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-top: 12px;
+        }
+        .upload-preview img { width: 52px; height: 52px; object-fit: cover; border-radius: 8px; }
+        .preview-info { text-align: left; flex: 1; }
+        .preview-name { font-size: 14px; font-weight: 500; }
+        .preview-size { font-size: 12px; color: var(--muted); margin-top: 2px; }
+        .preview-remove {
+            background: none; border: none; color: var(--muted); cursor: pointer;
+            font-size: 18px; padding: 4px; border-radius: 6px; transition: color 0.2s;
+        }
+        .preview-remove:hover { color: var(--red); }
+        .size-warning {
+            display: none;
+            color: var(--yellow);
+            font-size: 12px;
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: rgba(251, 191, 36, 0.1);
+            border-radius: 8px;
+        }
+
+        /* DESCRIPTION */
+        textarea {
+            width: 100%;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+            padding: 14px 16px;
+            resize: vertical;
+            min-height: 110px;
+            transition: border-color 0.2s;
+            outline: none;
+        }
+        textarea:focus { border-color: var(--accent); }
+        textarea::placeholder { color: var(--muted); }
+
+        /* BUTTON */
+        .split-btn {
+            width: 100%;
+            max-width: 780px;
+            margin: 0 auto;
+            display: block;
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            letter-spacing: 0.2px;
+        }
+        .split-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(108, 99, 255, 0.4);
+        }
+        .split-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        /* LOADER */
+        #loader { display: none; max-width: 780px; margin: 24px auto 0; text-align: center; }
+        .loader-bar {
+            width: 100%;
+            height: 3px;
+            background: var(--surface2);
+            border-radius: 99px;
+            overflow: hidden;
+            margin-bottom: 14px;
+        }
+        .loader-bar-inner {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            border-radius: 99px;
+            animation: progress 25s ease-out forwards;
+        }
+        @keyframes progress { 0% { width: 0% } 40% { width: 60% } 80% { width: 85% } 100% { width: 92% } }
+        .loader-status { color: var(--muted); font-size: 13px; }
+        .loader-timer { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+        /* RESULTS */
+        #results { display: none; max-width: 780px; margin: 28px auto 0; }
+
+        .results-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .results-title { font-size: 20px; font-weight: 700; }
+        .grand-total-badge {
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            border-radius: 10px;
+            padding: 8px 16px;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        /* PERSON CARDS GRID */
+        .person-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+        .person-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .person-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+        .person-avatar {
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; font-weight: 700;
+            margin-bottom: 12px;
+            flex-shrink: 0;
+        }
+        .person-name { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+        .person-items {
+            font-size: 12px; color: var(--muted);
+            list-style: none;
+            margin-bottom: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .person-items li::before { content: '• '; color: var(--accent2); }
+        .person-breakdown {
+            border-top: 1px solid var(--border);
+            padding-top: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .breakdown-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--muted);
+        }
+        .breakdown-row.total {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text);
+            margin-top: 4px;
+            padding-top: 6px;
+            border-top: 1px solid var(--border);
+        }
+        .discount-val { color: var(--green); }
+
+        /* SETTLE UP */
+        .settle-section { margin-bottom: 20px; }
+        .settle-item {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .settle-transfer {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .settle-arrow { color: var(--accent2); font-size: 18px; }
+        .settle-amount {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--accent2);
+        }
+
+        /* RECONCILIATION BANNER */
+        .recon-banner {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+        .recon-banner.ok { background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52,211,153,0.2); color: var(--green); }
+        .recon-banner.fail { background: rgba(248, 113, 113, 0.1); border: 1px solid rgba(248,113,113,0.2); color: var(--red); }
+
+        /* FLAGS & ASSUMPTIONS */
+        .info-section { margin-bottom: 20px; }
+        .info-badge {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+        .badge-flag { background: rgba(248,113,113,0.15); color: var(--red); }
+        .badge-assumption { background: rgba(251,191,36,0.15); color: var(--yellow); }
+        .info-list { display: flex; flex-direction: column; gap: 8px; }
+        .info-item {
+            font-size: 13px;
+            color: var(--muted);
+            padding: 10px 14px;
+            background: var(--surface);
+            border-radius: 8px;
+            border-left: 3px solid;
+            line-height: 1.5;
+        }
+        .info-item.flag { border-color: var(--red); }
+        .info-item.assumption { border-color: var(--yellow); }
+
+        /* ERROR */
+        .error-box {
+            display: none;
+            background: rgba(248,113,113,0.1);
+            border: 1px solid rgba(248,113,113,0.2);
+            border-radius: 12px;
+            padding: 16px 20px;
+            color: var(--red);
+            font-size: 14px;
+            max-width: 780px;
+            margin: 24px auto 0;
+        }
+        .error-box strong { display: block; margin-bottom: 4px; }
+
+        /* AVATARS */
+        .avatar-colors {
+            --c1: #6c63ff; --c2: #34d399; --c3: #f59e0b;
+            --c4: #ec4899; --c5: #3b82f6; --c6: #8b5cf6;
+        }
+
+        /* UTIL */
+        section-label {
+            font-size: 13px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.8px;
+            color: var(--muted); display: block; margin-bottom: 12px;
+        }
+
+        @media (max-width: 480px) {
+            .person-grid { grid-template-columns: 1fr; }
+            .results-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">
+        <div class="logo-icon">🧾</div>
+        <h1>Fair Split</h1>
+    </div>
+    <p class="tagline">Upload a receipt · Describe who had what · Get exact shares instantly</p>
+</header>
+
+<!-- INPUT CARD -->
+<div class="card">
+    <div class="card-title">Receipt</div>
+    <div class="upload-zone" id="uploadZone">
+        <input type="file" id="receiptFile" accept="image/*">
+        <div class="upload-icon">📷</div>
+        <div class="upload-label">Click or drag to upload receipt</div>
+        <div class="upload-hint">JPEG, PNG, WEBP · Compressed automatically if large</div>
+    </div>
+    <div class="size-warning" id="sizeWarning">⚠️ Image is large — compressing automatically before upload…</div>
+    <div class="upload-preview" id="uploadPreview">
+        <img id="previewImg" src="" alt="preview">
+        <div class="preview-info">
+            <div class="preview-name" id="previewName">—</div>
+            <div class="preview-size" id="previewSize">—</div>
+        </div>
+        <button class="preview-remove" id="removeFile" title="Remove">✕</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title">Who had what?</div>
+    <textarea id="description" placeholder="e.g. We are 4 people. Aman paid. Priya and I shared the pasta. Rahul had the steak alone. We all split the dessert equally."></textarea>
+</div>
+
+<button class="split-btn" id="splitBtn">✨ Calculate Fair Split</button>
+
+<!-- LOADER -->
+<div id="loader">
+    <div class="loader-bar"><div class="loader-bar-inner" id="loaderBar"></div></div>
+    <div class="loader-status" id="loaderStatus">Sending to AI…</div>
+    <div class="loader-timer" id="loaderTimer">This usually takes 10–25 seconds</div>
+</div>
+
+<!-- ERROR -->
+<div class="error-box" id="errorBox">
+    <strong>Something went wrong</strong>
+    <span id="errorMsg"></span>
+</div>
+
+<!-- RESULTS -->
+<div id="results">
+    <div class="results-header">
+        <div class="results-title">Split Summary</div>
+        <div class="grand-total-badge">Total: <span id="grandTotalVal">₹0</span></div>
+    </div>
+
+    <!-- Reconciliation -->
+    <div id="reconBanner" class="recon-banner"></div>
+
+    <!-- Per Person -->
+    <section-label>Per Person</section-label>
+    <div class="person-grid" id="personGrid"></div>
+
+    <!-- Settle Up -->
+    <div class="settle-section" id="settleSection" style="display:none">
+        <section-label>Settle Up</section-label>
+        <div id="settleList"></div>
+    </div>
+
+    <!-- Flags -->
+    <div class="info-section" id="flagsSection" style="display:none">
+        <span class="info-badge badge-flag">⚠️ Flags</span>
+        <div class="info-list" id="flagsList"></div>
+    </div>
+
+    <!-- Assumptions -->
+    <div class="info-section" id="assumptionsSection" style="display:none">
+        <span class="info-badge badge-assumption">💡 Assumptions</span>
+        <div class="info-list" id="assumptionsList"></div>
+    </div>
+</div>
+
+<script>
+    const AVATAR_COLORS = ['#6c63ff','#34d399','#f59e0b','#ec4899','#3b82f6','#8b5cf6','#14b8a6','#f97316'];
+    const MAX_DIMENSION = 1600;
+    const MAX_BYTES = 4 * 1024 * 1024; // 4MB
+    const COMPRESS_THRESHOLD = 1.5 * 1024 * 1024; // 1.5MB — compress if above
+
+    let compressedBase64 = null;
+    let loaderInterval = null;
+    let timerInterval = null;
+
+    // --- FILE UPLOAD ---
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('receiptFile');
+    const uploadPreview = document.getElementById('uploadPreview');
+    const previewImg = document.getElementById('previewImg');
+    const previewName = document.getElementById('previewName');
+    const previewSize = document.getElementById('previewSize');
+    const sizeWarning = document.getElementById('sizeWarning');
+
+    uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+    uploadZone.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadZone.classList.remove('dragover');
+        if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+    document.getElementById('removeFile').addEventListener('click', resetFile);
+
+    function resetFile() {
+        compressedBase64 = null;
+        fileInput.value = '';
+        uploadPreview.style.display = 'none';
+        uploadZone.style.display = 'block';
+        sizeWarning.style.display = 'none';
+    }
+
+    function handleFile(file) {
+        if (!file.type.startsWith('image/')) {
+            showError('Please upload an image file (JPEG, PNG, WEBP).'); return;
+        }
+        const reader = new FileReader();
+        reader.onload = e => {
+            const originalB64 = e.target.result.split(',')[1];
+            if (file.size > MAX_BYTES) {
+                showError(`Image is too large (${(file.size/1024/1024).toFixed(1)}MB). Please use an image under 4MB.`);
+                return;
+            }
+            if (file.size > COMPRESS_THRESHOLD) {
+                sizeWarning.style.display = 'block';
+                compressImage(e.target.result, MAX_DIMENSION, 0.82).then(b64 => {
+                    compressedBase64 = b64;
+                    sizeWarning.style.display = 'none';
+                    showPreview(file, b64);
+                });
+            } else {
+                compressedBase64 = originalB64;
+                showPreview(file, originalB64);
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function showPreview(file, b64) {
+        const byteLen = Math.round(b64.length * 0.75 / 1024);
+        previewImg.src = 'data:image/jpeg;base64,' + b64;
+        previewName.textContent = file.name;
+        previewSize.textContent = `${byteLen} KB after compression`;
+        uploadPreview.style.display = 'flex';
+        uploadZone.style.display = 'none';
+    }
+
+    function compressImage(dataUrl, maxDim, quality) {
+        return new Promise(resolve => {
+            const img = new Image();
+            img.onload = () => {
+                let { width, height } = img;
+                if (width > maxDim || height > maxDim) {
+                    const ratio = Math.min(maxDim / width, maxDim / height);
+                    width = Math.round(width * ratio);
+                    height = Math.round(height * ratio);
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width; canvas.height = height;
+                canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', quality).split(',')[1]);
+            };
+            img.src = dataUrl;
+        });
+    }
+
+    // --- SPLIT BUTTON ---
+    document.getElementById('splitBtn').addEventListener('click', async () => {
+        const description = document.getElementById('description').value.trim();
+        hideError();
+        hideResults();
+
+        if (!compressedBase64) { showError('Please upload a receipt image first.'); return; }
+        if (!description) { showError('Please describe who had what.'); return; }
+
+        startLoader();
+
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 55000);
+
+            const res = await fetch('/api/split', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ receipt_base64: compressedBase64, description }),
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+                // Retry hint on 503
+                if (res.status === 503 || (err.error && err.error.includes('503'))) {
+                    showError('The AI model is under high demand right now. Please wait 30 seconds and try again.');
+                } else {
+                    showError(err.error || `Server error ${res.status}`);
+                }
+                return;
+            }
+
+            const data = await res.json();
+            stopLoader();
+            renderResults(data);
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                showError('Request timed out after 55 seconds. Please try again — the AI server may be busy.');
+            } else {
+                showError(err.message);
+            }
+        } finally {
+            stopLoader();
+        }
+    });
+
+    // --- LOADER ---
+    const statusMessages = [
+        'Sending to AI…',
+        'Analysing receipt image…',
+        'Identifying items and people…',
+        'Applying proportional math…',
+        'Calculating settle-up graph…',
+        'Almost done…'
+    ];
+
+    function startLoader() {
+        document.getElementById('splitBtn').disabled = true;
+        document.getElementById('loader').style.display = 'block';
+        document.getElementById('loaderBar').style.animation = 'none';
+        document.getElementById('loaderBar').offsetHeight; // reflow
+        document.getElementById('loaderBar').style.animation = '';
+
+        let idx = 0;
+        document.getElementById('loaderStatus').textContent = statusMessages[0];
+        loaderInterval = setInterval(() => {
+            idx = Math.min(idx + 1, statusMessages.length - 1);
+            document.getElementById('loaderStatus').textContent = statusMessages[idx];
+        }, 4500);
+
+        let secs = 0;
+        document.getElementById('loaderTimer').textContent = 'This usually takes 10–25 seconds';
+        timerInterval = setInterval(() => {
+            secs++;
+            document.getElementById('loaderTimer').textContent = `${secs}s elapsed`;
+        }, 1000);
+    }
+
+    function stopLoader() {
+        document.getElementById('splitBtn').disabled = false;
+        document.getElementById('loader').style.display = 'none';
+        clearInterval(loaderInterval);
+        clearInterval(timerInterval);
+    }
+
+    // --- RENDER ---
+    function renderResults(data) {
+        document.getElementById('grandTotalVal').textContent = `₹${data.grand_total}`;
+
+        // Reconciliation
+        const recon = document.getElementById('reconBanner');
+        if (data.reconciliation.matches_bill) {
+            recon.className = 'recon-banner ok';
+            recon.innerHTML = '✅ Bill reconciles perfectly — all shares sum to the printed grand total.';
+        } else {
+            recon.className = 'recon-banner fail';
+            recon.innerHTML = `⚠️ Reconciliation mismatch — calculated <strong>₹${data.reconciliation.sum_of_person_totals}</strong> vs printed <strong>₹${data.grand_total}</strong>.`;
+        }
+
+        // Person cards
+        const grid = document.getElementById('personGrid');
+        grid.innerHTML = '';
+        data.per_person.forEach((p, i) => {
+            const color = AVATAR_COLORS[i % AVATAR_COLORS.length];
+            const initials = p.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
+            const itemsHtml = p.items.map(it => `<li>${it}</li>`).join('');
+            const discountRow = p.discount_share !== 0
+                ? `<div class="breakdown-row"><span>Discount</span><span class="discount-val">-₹${Math.abs(p.discount_share)}</span></div>` : '';
+            grid.innerHTML += `
+                <div class="person-card">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+                        <div class="person-avatar" style="background:${color}22;color:${color}">${initials}</div>
+                        <div class="person-name">${p.name}</div>
+                    </div>
+                    <ul class="person-items">${itemsHtml}</ul>
+                    <div class="person-breakdown">
+                        <div class="breakdown-row"><span>Subtotal</span><span>₹${p.subtotal}</span></div>
+                        <div class="breakdown-row"><span>Tax</span><span>₹${p.tax_share}</span></div>
+                        <div class="breakdown-row"><span>Service</span><span>₹${p.service_share}</span></div>
+                        ${discountRow}
+                        <div class="breakdown-row total"><span>Total</span><span>₹${p.total}</span></div>
+                    </div>
+                </div>`;
+        });
+
+        // Settle up
+        const settleSection = document.getElementById('settleSection');
+        const settleList = document.getElementById('settleList');
+        settleList.innerHTML = '';
+        if (data.settle_up && data.settle_up.length > 0) {
+            settleSection.style.display = 'block';
+            data.settle_up.forEach(s => {
+                settleList.innerHTML += `
+                    <div class="settle-item">
+                        <div class="settle-transfer">
+                            <strong>${s.from}</strong>
+                            <span class="settle-arrow">→</span>
+                            <strong>${s.to}</strong>
+                        </div>
+                        <div class="settle-amount">₹${s.amount}</div>
+                    </div>`;
+            });
+        } else {
+            settleSection.style.display = 'none';
+        }
+
+        // Flags
+        const flagsSection = document.getElementById('flagsSection');
+        const flagsList = document.getElementById('flagsList');
+        flagsList.innerHTML = '';
+        if (data.flags && data.flags.length > 0) {
+            flagsSection.style.display = 'block';
+            data.flags.forEach(f => {
+                flagsList.innerHTML += `<div class="info-item flag">${f}</div>`;
+            });
+        } else { flagsSection.style.display = 'none'; }
+
+        // Assumptions
+        const assumptionsSection = document.getElementById('assumptionsSection');
+        const assumptionsList = document.getElementById('assumptionsList');
+        assumptionsList.innerHTML = '';
+        if (data.assumptions && data.assumptions.length > 0) {
+            assumptionsSection.style.display = 'block';
+            data.assumptions.forEach(a => {
+                assumptionsList.innerHTML += `<div class="info-item assumption">${a}</div>`;
+            });
+        } else { assumptionsSection.style.display = 'none'; }
+
+        document.getElementById('results').style.display = 'block';
+        document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function hideResults() {
+        document.getElementById('results').style.display = 'none';
+    }
+
+    function showError(msg) {
+        stopLoader();
+        const box = document.getElementById('errorBox');
+        document.getElementById('errorMsg').textContent = msg;
+        box.style.display = 'block';
+        box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function hideError() {
+        document.getElementById('errorBox').style.display = 'none';
+    }
+</script>
+</body>
+</html>
